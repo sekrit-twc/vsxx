@@ -946,13 +946,13 @@ public:
 	// VSAPI::setMaxCacheSize.
 	int64_t set_max_cache_size(int64_t bytes) const noexcept
 	{
-		get_vsapi()->setMaxCacheSize(bytes, get());
+		return get_vsapi()->setMaxCacheSize(bytes, get());
 	}
 
 	// VSAPI::setThreadCount.
 	int set_thread_count(int threads) const noexcept
 	{
-		get_vsapi()->setThreadCount(threads, get());
+		return get_vsapi()->setThreadCount(threads, get());
 	}
 };
 
