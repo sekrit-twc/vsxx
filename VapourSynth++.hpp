@@ -268,10 +268,6 @@ template <class T>
 struct MapSetProp<T, typename std::enable_if<std::is_convertible<T, const char *>::value, T>::type> {
 	static int set(::VSMap *map, const char *key, const T &x, VSPropAppendMode append) noexcept
 	{
-		size_t len = strlen(x);
-		if (len > std::numeric_limits<int>::max())
-			return 1;
-
 		return get_vsapi()->propSetData(map, key, x, strlen(x), append);
 	}
 };
@@ -279,9 +275,6 @@ template <>
 struct MapSetProp<std::string> {
 	static int set(::VSMap *map, const char *key, const std::string &x, VSPropAppendMode append) noexcept
 	{
-		if (x.size() > std::numeric_limits<int>::max())
-			return 1;
-
 		return get_vsapi()->propSetData(map, key, x.c_str(), static_cast<int>(x.size()), append);
 	}
 };
@@ -354,7 +347,7 @@ public:
 	// VSAPI::propGetKey.
 	const char *get_key(size_t index) const noexcept
 	{
-		return get_vsapi()->propGetKey(get(), static_cast<size_t>(index));
+		return get_vsapi()->propGetKey(get(), static_cast<int>(index));
 	}
 
 	// VSAPI::propGetX.
