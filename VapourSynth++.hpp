@@ -339,9 +339,17 @@ public:
 	}
 
 	// VSAPI::propNumElements.
-	size_t num_elements(const char *key) const noexcept
+	bool contains(const char *key) const noexcept
 	{
-		return get_vsapi()->propNumElements(get(), key);
+		return get_vsapi()->propNumElements(get(), key) >= 0;
+	}
+
+	size_t num_elements(const char *key) const
+	{
+		int ret = get_vsapi()->propNumElements(get(), key);
+		if (ret < 0)
+			throw map::UnsetError{ key };
+		return ret;
 	}
 
 	// VSAPI::propGetKey.
