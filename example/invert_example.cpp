@@ -32,9 +32,10 @@ public:
 		return{ &m_vi, 1 };
 	}
 
-	void get_frame_initial(int n, const VapourCore &, VSFrameContext *frame_ctx) override
+	ConstVideoFrame get_frame_initial(int n, const VapourCore &, VSFrameContext *frame_ctx) override
 	{
 		m_node.request_frame_filter(n, frame_ctx);
+		return ConstVideoFrame{};
 	}
 
 	ConstVideoFrame get_frame(int n, const VapourCore &core, VSFrameContext *frame_ctx) override

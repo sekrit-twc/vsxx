@@ -1072,7 +1072,7 @@ class FilterBase {
 		try {
 			switch (activation_reason) {
 			case arInitial:
-				get_frame_initial(n, core, frame_ctx);
+				frame = get_frame_initial(n, core, frame_ctx);
 				break;
 			case arFrameReady:
 				get_frame_one_ready(n, core, frame_ctx);
@@ -1142,7 +1142,7 @@ public:
 	virtual std::pair<const VSVideoInfo *, size_t> get_video_info() noexcept = 0;
 
 	// VSFilterFrame. Throwing an exception is equivalent to setting a filter error on |frame_ctx|.
-	virtual void get_frame_initial(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) = 0;
+	virtual ConstVideoFrame get_frame_initial(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) = 0;
 	virtual void get_frame_one_ready(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) {}
 	virtual ConstVideoFrame get_frame(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) = 0;
 	virtual void get_frame_error(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) {}
