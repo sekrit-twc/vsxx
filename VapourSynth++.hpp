@@ -359,7 +359,8 @@ public:
 	}
 
 	// VSAPI::propGetX.
-	template <class T, class ErrorPolicy = map::Throw>
+	template <class T, class ErrorPolicy = map::Throw,
+	          typename std::enable_if<!std::is_convertible<ErrorPolicy, int>::value>::type * = nullptr>
 	T get_prop(const char *key, ErrorPolicy error_policy = ErrorPolicy{}) const
 	{
 		return get_prop<T>(key, 0, error_policy);
