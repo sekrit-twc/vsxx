@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "VapourSynth.h"
+#include "VSHelper.h"
 
 // Define this to avoid name conflicts if using in a library.
 #ifndef VSXX_NAMESPACE
