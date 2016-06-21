@@ -62,7 +62,7 @@ class Default {
 public:
 	explicit Default(const T &value) noexcept : m_value{ value } {}
 
-	const T &operator()(const T &, const char *, VSGetPropErrors) noexcept
+	const T &operator()(const T &, const char *, ::VSGetPropErrors) noexcept
 	{
 		return m_value;
 	}
@@ -70,7 +70,7 @@ public:
 
 struct Ignore {
 	template <class T>
-	T operator()(const T &, const char *, VSGetPropErrors) noexcept
+	T operator()(const T &, const char *, ::VSGetPropErrors) noexcept
 	{
 		return T{};
 	}
@@ -82,7 +82,7 @@ public:
 	explicit Throw(unsigned mask = 0) noexcept : m_mask{ mask } {}
 
 	template <class T>
-	const T &operator()(const T &x, const char *key, VSGetPropErrors error)
+	const T &operator()(const T &x, const char *key, ::VSGetPropErrors error)
 	{
 		if (m_mask & error)
 			return x;
@@ -116,9 +116,9 @@ inline Default<std::string> default_str(const std::string &s)
 
 namespace detail {
 
-inline const VSAPI *vsapi(bool set = false, const VSAPI *ptr = nullptr)
+inline const ::VSAPI *vsapi(bool set = false, const ::VSAPI *ptr = nullptr)
 {
-	static const VSAPI *vsapi = nullptr;
+	static const ::VSAPI *vsapi = nullptr;
 
 	if (set)
 		vsapi = ptr;
@@ -246,7 +246,7 @@ struct MapSetProp;
 // VSAPI::propSetInt.
 template <class T>
 struct MapSetProp<T, typename std::enable_if<std::is_integral<T>::value, T>::type> {
-	static int set(::VSMap *map, const char *key, T x, VSPropAppendMode append) noexcept
+	static int set(::VSMap *map, const char *key, T x, ::VSPropAppendMode append) noexcept
 	{
 		if (append != paTouch && x > std::numeric_limits<int64_t>::max())
 			return 1;
@@ -257,7 +257,7 @@ struct MapSetProp<T, typename std::enable_if<std::is_integral<T>::value, T>::typ
 // VSAPI::propSetFloat.
 template <class T>
 struct MapSetProp<T, typename std::enable_if<std::is_floating_point<T>::value, T>::type> {
-	static int set(::VSMap *map, const char *key, T x, VSPropAppendMode append) noexcept
+	static int set(::VSMap *map, const char *key, T x, ::VSPropAppendMode append) noexcept
 	{
 		return get_vsapi()->propSetFloat(map, key, x, append);
 	}
@@ -266,14 +266,14 @@ struct MapSetProp<T, typename std::enable_if<std::is_floating_point<T>::value, T
 // VSAPI::propSetData.
 template <class T>
 struct MapSetProp<T, typename std::enable_if<std::is_convertible<T, const char *>::value, T>::type> {
-	static int set(::VSMap *map, const char *key, const T &x, VSPropAppendMode append) noexcept
+	static int set(::VSMap *map, const char *key, const T &x, ::VSPropAppendMode append) noexcept
 	{
 		return get_vsapi()->propSetData(map, key, x, strlen(x), append);
 	}
 };
 template <>
 struct MapSetProp<std::string> {
-	static int set(::VSMap *map, const char *key, const std::string &x, VSPropAppendMode append) noexcept
+	static int set(::VSMap *map, const char *key, const std::string &x, ::VSPropAppendMode append) noexcept
 	{
 		return get_vsapi()->propSetData(map, key, x.c_str(), static_cast<int>(x.size()), append);
 	}
@@ -282,19 +282,19 @@ struct MapSetProp<std::string> {
 // VSAPI::propSetNode.
 template <>
 struct MapSetProp<FilterNode> {
-	static inline int set(::VSMap *map, const char *key, const FilterNode &x, VSPropAppendMode append) noexcept;
+	static inline int set(::VSMap *map, const char *key, const FilterNode &x, ::VSPropAppendMode append) noexcept;
 };
 
 // VSAPI::propSetFrame.
 template <>
 struct MapSetProp<ConstVideoFrame> {
-	static inline int set(::VSMap *map, const char *key, const ConstVideoFrame &x, VSPropAppendMode append) noexcept;
+	static inline int set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept;
 };
 
 // VSAPI::propSetFunc.
 template <>
 struct MapSetProp<FilterFunc> {
-	static inline int set(::VSMap *map, const char *key, const FilterFunc &x, VSPropAppendMode append) noexcept;
+	static inline int set(::VSMap *map, const char *key, const FilterFunc &x, ::VSPropAppendMode append) noexcept;
 };
 
 // Interface for VSMap.
@@ -389,7 +389,7 @@ public:
 	// VSAPI::propSetX.
 	template <class T, class U = Map,
 	          typename std::enable_if<!std::is_const<U>::value, int>::type = 0>
-	void set_prop(const char *key, const T &value, VSPropAppendMode append = paReplace) const
+	void set_prop(const char *key, const T &value, ::VSPropAppendMode append = paReplace) const
 	{
 		if (MapSetProp<T>::set(get(), key, value, append))
 			throw map::AppendError{ key };
@@ -453,7 +453,7 @@ public:
 	uint8_t *write_ptr(int plane) const noexcept { return get_vsapi()->getWritePtr(get(), plane); }
 
 	// VSAPI::getFrameFormat.
-	const VSFormat &format() const noexcept
+	const ::VSFormat &format() const noexcept
 	{
 		return *get_vsapi()->getFrameFormat(get());
 	}
@@ -641,7 +641,7 @@ ConstVideoFrame detail::MapGetProp<ConstVideoFrame>::get(const ::VSMap *map, con
 	return ConstVideoFrame{ frame };
 }
 
-int detail::MapSetProp<ConstVideoFrame>::set(::VSMap *map, const char *key, const ConstVideoFrame &x, VSPropAppendMode append) noexcept
+int detail::MapSetProp<ConstVideoFrame>::set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetFrame(map, key, x.get(), append);
 }
@@ -742,7 +742,7 @@ public:
 		get_vsapi()->releaseFrameEarly(get(), n, frame_ctx);
 	}
 
-	const VSVideoInfo &video_info() const noexcept
+	const ::VSVideoInfo &video_info() const noexcept
 	{
 		return *get_vsapi()->getVideoInfo(get());
 	}
@@ -763,7 +763,7 @@ FilterNode detail::MapGetProp<FilterNode>::get(const ::VSMap *map, const char *k
 	return FilterNode{ node };
 }
 
-int detail::MapSetProp<FilterNode>::set(::VSMap *map, const char *key, const FilterNode &x, VSPropAppendMode append) noexcept
+int detail::MapSetProp<FilterNode>::set(::VSMap *map, const char *key, const FilterNode &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetNode(map, key, x.get(), append);
 }
@@ -828,7 +828,7 @@ FilterFunc detail::MapGetProp<FilterFunc>::get(const ::VSMap *map, const char *k
 	return FilterFunc{ func };
 }
 
-int detail::MapSetProp<FilterFunc>::set(::VSMap *map, const char *key, const FilterFunc &x, VSPropAppendMode append) noexcept
+int detail::MapSetProp<FilterFunc>::set(::VSMap *map, const char *key, const FilterFunc &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetFunc(map, key, x.get(), append);
 }
@@ -879,7 +879,7 @@ public:
 	::VSCore *get() const noexcept { return m_core; }
 
 	// VSAPI::getCoreInfo.
-	const VSCoreInfo *core_info() const noexcept
+	const ::VSCoreInfo *core_info() const noexcept
 	{
 		return get_vsapi()->getCoreInfo(get());
 	}
@@ -892,7 +892,7 @@ public:
 	}
 
 	// VSAPI::newVideoFrame2.
-	VideoFrame new_video_frame(const VSFormat &format, int width, int height,
+	VideoFrame new_video_frame(const ::VSFormat &format, int width, int height,
 	                           const ConstVideoFrame plane_src[3], const int planes[3],
 	                           const ConstVideoFrame &prop_src = ConstVideoFrame{})
 	{
@@ -940,13 +940,13 @@ public:
 	}
 
 	// VSAPI::getFormatPreset.
-	const VSFormat *format_preset(VSPresetFormat id) const noexcept
+	const ::VSFormat *format_preset(::VSPresetFormat id) const noexcept
 	{
 		return get_vsapi()->getFormatPreset(id, get());
 	}
 
 	// VSAPI::registerFormat.
-	const VSFormat *register_format(VSColorFamily color_family, VSSampleType sample_type,
+	const ::VSFormat *register_format(::VSColorFamily color_family, ::VSSampleType sample_type,
 	                                int bits_per_sample, int subsampling_w, int subsampling_h) const noexcept
 	{
 		return get_vsapi()->registerFormat(color_family, sample_type, bits_per_sample, subsampling_w, subsampling_h, get());
@@ -1139,7 +1139,7 @@ public:
 	virtual void post_init(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) {};
 
 	// Used in VSFilterInit.
-	virtual std::pair<const VSVideoInfo *, size_t> get_video_info() noexcept = 0;
+	virtual std::pair<const ::VSVideoInfo *, size_t> get_video_info() noexcept = 0;
 
 	// VSFilterFrame. Throwing an exception is equivalent to setting a filter error on |frame_ctx|.
 	virtual ConstVideoFrame get_frame_initial(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) = 0;
