@@ -291,6 +291,11 @@ struct MapSetProp<ConstVideoFrame> {
 	static inline int set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept;
 };
 
+template <>
+struct MapSetProp<VideoFrame> {
+	static inline int set(::VSMap *map, const char *key, const VideoFrame &x, ::VSPropAppendMode append) noexcept;
+};
+
 // VSAPI::propSetFunc.
 template <>
 struct MapSetProp<FilterFunc> {
@@ -646,6 +651,10 @@ int detail::MapSetProp<ConstVideoFrame>::set(::VSMap *map, const char *key, cons
 	return get_vsapi()->propSetFrame(map, key, x.get(), append);
 }
 
+int detail::MapSetProp<VideoFrame>::set(::VSMap *map, const char *key, const VideoFrame &x, ::VSPropAppendMode append) noexcept
+{
+	return get_vsapi()->propSetFrame(map, key, x.get(), append);
+}
 
 // Reference counted wrapper for VSNodeRef.
 // Calls VSAPI::cloneNodeRef on copy and VSAPI::freeNode on destruction.
