@@ -1047,7 +1047,7 @@ class FilterBase {
 		delete filter;
 	}
 
-	void create_filter(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core, const ::VSAPI *vsapi) noexcept
+	void create_filter(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) noexcept
 	{
 		try {
 			std::pair<VSFilterMode, int> flags = init(in, out, core);
@@ -1129,7 +1129,7 @@ public:
 			set_vsapi(vsapi);
 
 		FilterBase *filter = new Derived{ user_data };
-		filter->create_filter(ConstPropertyMapRef{ in }, PropertyMapRef{ out }, VapourCoreRef{ core }, vsapi);
+		filter->create_filter(ConstPropertyMapRef{ in }, PropertyMapRef{ out }, VapourCoreRef{ core });
 	}
 
 	FilterBase(const FilterBase &) = delete;
