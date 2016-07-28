@@ -448,15 +448,24 @@ public:
 	}
 
 	// VSAPI::getStride.
-	int stride(int plane) const noexcept { return get_vsapi()->getStride(get(), plane); }
+	int stride(int plane) const noexcept
+	{
+		return get_vsapi()->getStride(get(), plane);
+	}
 
 	// VSAPI::getReadPtr.
-	const uint8_t *read_ptr(int plane) const noexcept { return get_vsapi()->getReadPtr(get(), plane); }
+	const uint8_t *read_ptr(int plane) const noexcept
+	{
+		return get_vsapi()->getReadPtr(get(), plane);
+	}
 
 	// VSAPI::getWritePtr.
 	template <class T = Ref,
 	          typename std::enable_if<!std::is_const<T>::value, int>::type = 0>
-	uint8_t *write_ptr(int plane) const noexcept { return get_vsapi()->getWritePtr(get(), plane); }
+	uint8_t *write_ptr(int plane) const noexcept
+	{
+		return get_vsapi()->getWritePtr(get(), plane);
+	}
 
 	// VSAPI::getFrameFormat.
 	const ::VSFormat &format() const noexcept
@@ -797,9 +806,16 @@ public:
 		m_func = get_vsapi()->cloneFuncRef(other.get());
 	}
 
-	FilterFunc(FilterFunc &&other) noexcept : FilterFunc{} { swap(other); }
+	FilterFunc(FilterFunc &&other) noexcept : FilterFunc{}
+	{
+		swap(other);
+	}
 
-	~FilterFunc() { if (m_func) get_vsapi()->freeFunc(m_func); }
+	~FilterFunc()
+	{
+		if (m_func)
+			get_vsapi()->freeFunc(m_func);
+	}
 
 	FilterFunc &operator=(FilterFunc other) { swap(other); return *this; }
 
