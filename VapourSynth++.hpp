@@ -225,19 +225,19 @@ struct MapGetProp<std::string> {
 // VSAPI::propGetNode.
 template <>
 struct MapGetProp<FilterNode> {
-	static inline FilterNode get(const ::VSMap *map, const char *key, int index, int *error) noexcept;
+	static FilterNode get(const ::VSMap *map, const char *key, int index, int *error) noexcept;
 };
 
 // VSAPI::propGetFrame.
 template <>
 struct MapGetProp<ConstVideoFrame> {
-	static inline ConstVideoFrame get(const ::VSMap *map, const char *key, int index, int *error) noexcept;
+	static ConstVideoFrame get(const ::VSMap *map, const char *key, int index, int *error) noexcept;
 };
 
 // VSAPI::propGetFunc.
 template <>
 struct MapGetProp<FilterFunc> {
-	static inline FilterFunc get(const ::VSMap *map, const char *key, int index, int *error) noexcept;
+	static FilterFunc get(const ::VSMap *map, const char *key, int index, int *error) noexcept;
 };
 
 // Template wrappers for VSAPI::propSetX.
@@ -283,24 +283,24 @@ struct MapSetProp<std::string> {
 // VSAPI::propSetNode.
 template <>
 struct MapSetProp<FilterNode> {
-	static inline int set(::VSMap *map, const char *key, const FilterNode &x, ::VSPropAppendMode append) noexcept;
+	static int set(::VSMap *map, const char *key, const FilterNode &x, ::VSPropAppendMode append) noexcept;
 };
 
 // VSAPI::propSetFrame.
 template <>
 struct MapSetProp<ConstVideoFrame> {
-	static inline int set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept;
+	static int set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept;
 };
 
 template <>
 struct MapSetProp<VideoFrame> {
-	static inline int set(::VSMap *map, const char *key, const VideoFrame &x, ::VSPropAppendMode append) noexcept;
+	static int set(::VSMap *map, const char *key, const VideoFrame &x, ::VSPropAppendMode append) noexcept;
 };
 
 // VSAPI::propSetFunc.
 template <>
 struct MapSetProp<FilterFunc> {
-	static inline int set(::VSMap *map, const char *key, const FilterFunc &x, ::VSPropAppendMode append) noexcept;
+	static int set(::VSMap *map, const char *key, const FilterFunc &x, ::VSPropAppendMode append) noexcept;
 };
 
 // Interface for VSMap.
@@ -642,7 +642,7 @@ public:
 };
 
 // Forward-declared member functions.
-ConstVideoFrame detail::MapGetProp<ConstVideoFrame>::get(const ::VSMap *map, const char *key, int index, int *error) noexcept
+inline ConstVideoFrame detail::MapGetProp<ConstVideoFrame>::get(const ::VSMap *map, const char *key, int index, int *error) noexcept
 {
 	int tmp = 0;
 
@@ -656,12 +656,12 @@ ConstVideoFrame detail::MapGetProp<ConstVideoFrame>::get(const ::VSMap *map, con
 	return ConstVideoFrame{ frame };
 }
 
-int detail::MapSetProp<ConstVideoFrame>::set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept
+inline int detail::MapSetProp<ConstVideoFrame>::set(::VSMap *map, const char *key, const ConstVideoFrame &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetFrame(map, key, x.get(), append);
 }
 
-int detail::MapSetProp<VideoFrame>::set(::VSMap *map, const char *key, const VideoFrame &x, ::VSPropAppendMode append) noexcept
+inline int detail::MapSetProp<VideoFrame>::set(::VSMap *map, const char *key, const VideoFrame &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetFrame(map, key, x.get(), append);
 }
@@ -761,6 +761,7 @@ public:
 		get_vsapi()->releaseFrameEarly(get(), n, frame_ctx);
 	}
 
+	// VSAPI::getVideoInfo.
 	const ::VSVideoInfo &video_info() const noexcept
 	{
 		return *get_vsapi()->getVideoInfo(get());
@@ -768,7 +769,7 @@ public:
 };
 
 // Forward-declared member functions.
-FilterNode detail::MapGetProp<FilterNode>::get(const ::VSMap *map, const char *key, int index, int *error) noexcept
+inline FilterNode detail::MapGetProp<FilterNode>::get(const ::VSMap *map, const char *key, int index, int *error) noexcept
 {
 	int tmp = 0;
 
@@ -782,7 +783,7 @@ FilterNode detail::MapGetProp<FilterNode>::get(const ::VSMap *map, const char *k
 	return FilterNode{ node };
 }
 
-int detail::MapSetProp<FilterNode>::set(::VSMap *map, const char *key, const FilterNode &x, ::VSPropAppendMode append) noexcept
+inline int detail::MapSetProp<FilterNode>::set(::VSMap *map, const char *key, const FilterNode &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetNode(map, key, x.get(), append);
 }
@@ -795,9 +796,9 @@ class FilterFunc {
 public:
 	typedef std::function<void(const ConstPropertyMap &, const PropertyMap &, const VapourCore &)> callback_type;
 private:
-	static inline void VS_CC filter_func_callback(const ::VSMap *in, ::VSMap *out, void *user_data, ::VSCore *core, const ::VSAPI *vsapi);
+	static void VS_CC filter_func_callback(const ::VSMap *in, ::VSMap *out, void *user_data, ::VSCore *core, const ::VSAPI *vsapi);
 public:
-	static inline FilterFunc create(const callback_type &callback, const VapourCore &core);
+	static FilterFunc create(const callback_type &callback, const VapourCore &core);
 
 	explicit FilterFunc(::VSFuncRef *func = nullptr) noexcept : m_func{ func } {}
 
@@ -840,7 +841,7 @@ public:
 };
 
 // Forward-declared member functions.
-FilterFunc detail::MapGetProp<FilterFunc>::get(const ::VSMap *map, const char *key, int index, int *error) noexcept
+inline FilterFunc detail::MapGetProp<FilterFunc>::get(const ::VSMap *map, const char *key, int index, int *error) noexcept
 {
 	int tmp = 0;
 
@@ -854,7 +855,7 @@ FilterFunc detail::MapGetProp<FilterFunc>::get(const ::VSMap *map, const char *k
 	return FilterFunc{ func };
 }
 
-int detail::MapSetProp<FilterFunc>::set(::VSMap *map, const char *key, const FilterFunc &x, ::VSPropAppendMode append) noexcept
+inline int detail::MapSetProp<FilterFunc>::set(::VSMap *map, const char *key, const FilterFunc &x, ::VSPropAppendMode append) noexcept
 {
 	return get_vsapi()->propSetFunc(map, key, x.get(), append);
 }
@@ -1026,7 +1027,7 @@ public:
 };
 
 // Forward-declared member functions
-void VS_CC FilterFunc::filter_func_callback(const ::VSMap *in, ::VSMap *out, void *user_data, ::VSCore *core, const ::VSAPI *vsapi)
+inline void VS_CC FilterFunc::filter_func_callback(const ::VSMap *in, ::VSMap *out, void *user_data, ::VSCore *core, const ::VSAPI *vsapi)
 {
 	const callback_type &callback = *static_cast<callback_type *>(user_data);
 	try {
@@ -1036,7 +1037,7 @@ void VS_CC FilterFunc::filter_func_callback(const ::VSMap *in, ::VSMap *out, voi
 	}
 }
 
-FilterFunc FilterFunc::create(const callback_type &callback, const VapourCore &core)
+inline FilterFunc FilterFunc::create(const callback_type &callback, const VapourCore &core)
 {
 	auto delete_callback = [](void *ptr) { delete static_cast<callback_type *>(ptr); };
 	return FilterFunc{ get_vsapi()->createFunc(&FilterFunc::filter_func_callback, new callback_type{ callback }, delete_callback, core.get(), get_vsapi()) };
@@ -1162,7 +1163,7 @@ public:
 
 	// Called after VSAPI::createFilter returns. Only for functions that need to manipulate the return map.
 	// Throwing an exception is equivalent to setting an error on |out|.
-	virtual void post_init(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) {};
+	virtual void post_init(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) {}
 
 	// Used in VSFilterInit.
 	virtual std::pair<const ::VSVideoInfo *, size_t> get_video_info() noexcept = 0;
