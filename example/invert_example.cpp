@@ -15,7 +15,7 @@ public:
 		return "Invert";
 	}
 
-	std::pair<VSFilterMode, int> init(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core)
+	std::pair<VSFilterMode, int> init(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) override
 	{
 		m_node = in.get_prop<FilterNode>("clip");
 		m_vi = m_node.video_info();
