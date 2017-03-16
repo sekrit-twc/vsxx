@@ -272,6 +272,7 @@ struct MapSetProp<T, typename std::enable_if<std::is_convertible<T, const char *
 		return get_vsapi()->propSetData(map, key, x, strlen(x), append);
 	}
 };
+
 template <>
 struct MapSetProp<std::string> {
 	static int set(::VSMap *map, const char *key, const std::string &x, ::VSPropAppendMode append) noexcept
@@ -974,7 +975,7 @@ public:
 
 	// VSAPI::registerFormat.
 	const ::VSFormat *register_format(::VSColorFamily color_family, ::VSSampleType sample_type,
-	                                int bits_per_sample, int subsampling_w, int subsampling_h) const noexcept
+	                                  int bits_per_sample, int subsampling_w, int subsampling_h) const noexcept
 	{
 		return get_vsapi()->registerFormat(color_family, sample_type, bits_per_sample, subsampling_w, subsampling_h, get());
 	}
@@ -1070,8 +1071,8 @@ class FilterBase {
 			std::pair<VSFilterMode, int> flags = init(in, out, core);
 
 			get_vsapi()->createFilter(in.get(), out.get(), get_name(0),
-				                        &FilterBase::filter_init, &FilterBase::filter_get_frame, &FilterBase::filter_free,
-				                        flags.first, flags.second, this, core.get());
+			                          &FilterBase::filter_init, &FilterBase::filter_get_frame, &FilterBase::filter_free,
+			                          flags.first, flags.second, this, core.get());
 			post_init(in, out, core);
 		} catch (const std::exception &e) {
 			std::string err_msg;
