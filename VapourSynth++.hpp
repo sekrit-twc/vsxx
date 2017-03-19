@@ -671,7 +671,7 @@ inline int detail::MapSetProp<VideoFrame>::set(::VSMap *map, const char *key, co
 // Calls VSAPI::cloneNodeRef on copy and VSAPI::freeNode on destruction.
 class FilterNode {
 public:
-	typedef std::function<void(const ConstVideoFrame &, int, const FilterNode &, const char *)> async_callback_type;
+	typedef std::function<void(ConstVideoFrame, int, const FilterNode &, const char *)> async_callback_type;
 private:
 	::VSNodeRef *m_node;
 
