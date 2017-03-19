@@ -1031,10 +1031,13 @@ public:
 inline void VS_CC FilterFunc::filter_func_callback(const ::VSMap *in, ::VSMap *out, void *user_data, ::VSCore *core, const ::VSAPI *vsapi)
 {
 	const callback_type &callback = *static_cast<callback_type *>(user_data);
+
 	try {
 		callback(ConstPropertyMapRef{ in }, PropertyMapRef{ out }, VapourCoreRef{ core });
+	} catch (const std::exception &e) {
+		get_vsapi()->setError(out, e.what());
 	} catch (...) {
-		// ...
+		get_vsapi()->setError(out, "unknown C++ exception");
 	}
 }
 
@@ -1086,6 +1089,8 @@ class FilterBase {
 			}
 
 			out.set_error(err_msg.c_str());
+		} catch (...) {
+			out.set_error("unknown C++ exception");
 		}
 
 		// If the filter creation fails, the core will not call VSFilterFree.
@@ -1126,6 +1131,8 @@ class FilterBase {
 			}
 
 			get_vsapi()->setFilterError(err_msg.c_str(), frame_ctx);
+		} catch (...) {
+			get_vsapi()->setFilterError("unknown C++ exception", frame_ctx);
 		}
 
 		return frame.release();
