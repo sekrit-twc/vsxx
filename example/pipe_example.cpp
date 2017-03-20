@@ -382,7 +382,7 @@ void write_y4m_header(FILE *file, const ::VSVideoInfo &vi)
 	}
 }
 
-void write_tc_header(FILE *file)
+void write_timecodes_header(FILE *file)
 {
 	if (fputs("# timecode format v2\n", file) < 0) {
 		_tperror(_T("failed to write timecodes"));
@@ -390,80 +390,79 @@ void write_tc_header(FILE *file)
 	}
 }
 
-void write_frame(const Arguments &args, int64_t *tc_num, int64_t *tc_den, int n, const vsxx::ConstVideoFrame &frame, FILE *out_file, FILE *tc_file)
+void write_frame(bool y4m, int n, const vsxx::ConstVideoFrame &frame, FILE *out_file)
 {
 	static const int gbr_order[] = { 1, 2, 0 };
 
-	if (out_file) {
-		const ::VSFormat &format = frame.format();
+	const ::VSFormat &format = frame.format();
 
-		if (args.y4m && fputs("FRAME\n", out_file) < 0) {
-			_tperror(_T("failed to write output"));
-			throw ScriptError{ "write failed" };
-		}
+	if (y4m && fputs("FRAME\n", out_file) < 0) {
+		_tperror(_T("failed to write output"));
+		throw ScriptError{ "write failed" };
+	}
 
-		for (int p = 0; p < format.numPlanes; ++p) {
-			int src_plane = format.colorFamily == cmRGB ? gbr_order[p] : p;
+	for (int p = 0; p < format.numPlanes; ++p) {
+		int src_plane = format.colorFamily == cmRGB ? gbr_order[p] : p;
 
-			const uint8_t *read_ptr = frame.read_ptr(src_plane);
-			int width = frame.width(src_plane);
-			int height = frame.height(src_plane);
-			int stride = frame.stride(src_plane);
+		const uint8_t *read_ptr = frame.read_ptr(src_plane);
+		int width = frame.width(src_plane);
+		int height = frame.height(src_plane);
+		int stride = frame.stride(src_plane);
 
-			for (int i = 0; i < height; ++i) {
-				const uint8_t *buf = read_ptr;
-				size_t n = width * format.bytesPerSample;
+		for (int i = 0; i < height; ++i) {
+			const uint8_t *buf = read_ptr;
+			size_t n = width * format.bytesPerSample;
 
-				while (n) {
-					size_t ret = std::fwrite(buf, 1, n, out_file);
-					if (ret != n && std::ferror(out_file)) {
-						_tperror(_T("failed to write output"));
-						throw ScriptError{ "write failed" };
-					}
-					buf += ret;
-					n -= ret;
+			while (n) {
+				size_t ret = std::fwrite(buf, 1, n, out_file);
+				if (ret != n && std::ferror(out_file)) {
+					_tperror(_T("failed to write output"));
+					throw ScriptError{ "write failed" };
 				}
-
-				read_ptr += stride;
+				buf += ret;
+				n -= ret;
 			}
+
+			read_ptr += stride;
 		}
 	}
-	if (tc_file) {
-		vsxx::ConstPropertyMapRef props = frame.frame_props_ro();
+}
 
-		if (fprintf(tc_file, "%f\n", static_cast<double>(*tc_num) * 1000 / *tc_den) < 0) {
-			_tperror(_T("failed to write timecodes"));
-			throw ScriptError{ "write failed" };
+void write_timecodes(int64_t *tc_num, int64_t *tc_den, int n, const vsxx::ConstVideoFrame &frame,FILE *tc_file)
+{
+	vsxx::ConstPropertyMapRef props = frame.frame_props_ro();
+
+	if (fprintf(tc_file, "%f\n", static_cast<double>(*tc_num) * 1000 / *tc_den) < 0) {
+		_tperror(_T("failed to write timecodes"));
+		throw ScriptError{ "write failed" };
+	}
+
+	try {
+		int64_t dur_num = props.get_prop<int64_t>("_DurationNum");
+		int64_t dur_den = props.get_prop<int64_t>("_DurationDen");
+
+		if (dur_num <= 0 || dur_den <= 0) {
+			_ftprintf(stderr, _T("bad duration %") _T(PRId64) _T("/%") _T(PRId64) _T(" at frame %d\n"),
+			          dur_num, dur_den, n);
+			throw ScriptError{ "bad duration value" };
 		}
 
-		try {
-			int64_t dur_num = props.get_prop<int64_t>("_DurationNum");
-			int64_t dur_den = props.get_prop<int64_t>("_DurationDen");
+		if (*tc_den == dur_den) {
+			*tc_num += dur_num;
+		} else {
+			int64_t tmp = dur_den;
+			dur_num *= *tc_den;
+			dur_den *= *tc_den;
+			*tc_num *= tmp;
+			*tc_den *= tmp;
 
-			if (dur_num <= 0 || dur_den <= 0) {
-				_ftprintf(stderr, _T("bad duration %") _T(PRId64) _T("/%") _T(PRId64) _T(" at frame %d\n"),
-				          dur_num, dur_den, n);
-				throw ScriptError{ "bad duration value" };
-			}
+			*tc_num += dur_num;
 
-			if (*tc_den == dur_den) {
-				*tc_num += dur_num;
-			} else {
-				int64_t tmp = dur_den;
-				dur_num *= *tc_den;
-				dur_den *= *tc_den;
-				*tc_num *= tmp;
-				*tc_den *= tmp;
-
-				*tc_num += dur_num;
-
-				muldivRational(tc_num, tc_den, 1, 1);
-			}
-		} catch (const vsxx::map::MapGetError &) {
-			_ftprintf(stderr, _T("missing duration at frame %d\n"), n);
-			throw ScriptError{ "missing duration" };
+			muldivRational(tc_num, tc_den, 1, 1);
 		}
-
+	} catch (const vsxx::map::MapGetError &) {
+		_ftprintf(stderr, _T("missing duration at frame %d\n"), n);
+		throw ScriptError{ "missing duration" };
 	}
 }
 
@@ -487,25 +486,26 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 	if (out_file && args.y4m)
 		write_y4m_header(out_file, vi);
 	if (tc_file)
-		write_tc_header(tc_file);
+		write_timecodes_header(tc_file);
 
 	std::mutex mutex;
 	std::condition_variable cv;
 	std::map<int, vsxx::ConstVideoFrame> queue;
 	std::atomic_int active_requests = 0;
+	std::atomic_int callback_lock = 0;
 	std::atomic_bool error_flag = false;
 
 	std::exception_ptr eptr;
 	std::mutex eptr_mutex;
 
-	auto frame_done_callback = [&](vsxx::ConstVideoFrame frame, int n, const vsxx::FilterNode &node, const char *error)
+	// Set a return value to trigger warning in case the callback exits without running the DONE macro.
+	auto frame_done_callback = [&](vsxx::ConstVideoFrame frame, int n, const vsxx::FilterNode &node, const char *error) -> int
 	{
-		--active_requests;
+#define DONE() do { --active_requests; cv.notify_one(); --callback_lock; return 0; } while (0)
+		++callback_lock;
 
-		if (error_flag) {
-			cv.notify_one();
-			return;
-		}
+		if (error_flag)
+			DONE();
 
 		if (!error) {
 			try {
@@ -521,7 +521,8 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 			error_flag = true;
 		}
 
-		cv.notify_one();
+		DONE();
+#undef DONE
 	};
 
 	try {
@@ -547,7 +548,10 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 
 				lock.unlock();
 
-				write_frame(args, &tc_num, &tc_den, output_cur, frame, out_file, tc_file);
+				if (out_file)
+					write_frame(args.y4m, output_cur, frame, out_file);
+				if (tc_file)
+					write_timecodes(&tc_num, &tc_den, output_cur, frame, tc_file);
 
 				if (args.progress) {
 					double fps = fps_counter.update();
@@ -577,9 +581,14 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 		error_flag = true;
 	}
 
+	// Wait for any requests to finish before exiting the stack frame.
 	if (active_requests) {
 		std::unique_lock<std::mutex> lock{ mutex };
 		cv.wait(lock, [&]() { return !active_requests; });
+	}
+	// Handle the case where active_requests hits zero before the lock is acquired.
+	while (callback_lock) {
+		// ...
 	}
 
 	if (eptr)
