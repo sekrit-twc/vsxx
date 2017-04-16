@@ -597,6 +597,37 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 		throw ScriptError{ "piping failed" };
 }
 
+void print_vi(const ::VSVideoInfo &vi)
+{
+	if (vi.width && vi.height) {
+		_ftprintf(stderr, _T("Width: %d\n"), vi.width);
+		_ftprintf(stderr, _T("Height: %d\n"), vi.height);
+	} else {
+		_fputts(_T("Width: Variable\n"), stderr);
+		_fputts(_T("Height: Variable\n"), stderr);
+	}
+
+	_ftprintf(stderr, _T("Frames: %d\n"), vi.numFrames);
+
+	if (vi.fpsNum && vi.fpsDen) {
+		_ftprintf(stderr, _T("FPS: %") _T(PRId64) _T("/%") _T(PRId64) _T(" (%.3f fps)\n"),
+		          vi.fpsNum, vi.fpsDen, static_cast<double>(vi.fpsNum) / vi.fpsDen);
+	} else {
+		_fputts(_T("FPS: Variable\n"), stderr);
+	}
+
+	if (vi.format) {
+		_ftprintf(stderr, _T("Format Name: %") FMT_S _T("\n"), vi.format->name);
+		_ftprintf(stderr, _T("Color Family: %") FMT_TS _T("\n"), cf_to_string(vi.format->colorFamily));
+		_ftprintf(stderr, _T("Sample Type: %") FMT_TS _T("\n"), st_to_string(vi.format->sampleType));
+		_ftprintf(stderr, _T("Bits: %d\n"), vi.format->bitsPerSample);
+		_ftprintf(stderr, _T("SubSampling W: %d\n"), vi.format->subSamplingW);
+		_ftprintf(stderr, _T("SubSampling H: %d\n"), vi.format->subSamplingH);
+	} else {
+		_fputts(_T("Format Name: Variable\n"), stderr);
+	}
+}
+
 void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 {
 	VSScriptGuard vss;
@@ -616,8 +647,6 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 		script.reset(script_ptr);
 
 		if (eval_err) {
-			script.release();
-			script.reset(script_ptr);
 			_ftprintf(stderr, _T("script evaluation failed: %") FMT_S _T("\n"), vsscript_getError(script_ptr));
 			throw ScriptError{ "failed to evaluate script" };
 		}
@@ -630,40 +659,11 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 	}
 
 	if (args.info) {
-		const ::VSVideoInfo &vi = node.video_info();
-
-		if (vi.width && vi.height) {
-			_ftprintf(stderr, _T("Width: %d\n"), vi.width);
-			_ftprintf(stderr, _T("Height: %d\n"), vi.height);
-		} else {
-			_fputts(_T("Width: Variable\n"), stderr);
-			_fputts(_T("Height: Variable\n"), stderr);
-		}
-
-		_ftprintf(stderr, _T("Frames: %d\n"), vi.numFrames);
-
-		if (vi.fpsNum && vi.fpsDen) {
-			_ftprintf(stderr, _T("FPS: %") _T(PRId64) _T("/%") _T(PRId64) _T(" (%.3f fps)\n"),
-			          vi.fpsNum, vi.fpsDen, static_cast<double>(vi.fpsNum) / vi.fpsDen);
-		} else {
-			_fputts(_T("FPS: Variable\n"), stderr);
-		}
-
-		if (vi.format) {
-			_ftprintf(stderr, _T("Format Name: %") FMT_S _T("\n"), vi.format->name);
-			_ftprintf(stderr, _T("Color Family: %") FMT_TS _T("\n"), cf_to_string(vi.format->colorFamily));
-			_ftprintf(stderr, _T("Sample Type: %") FMT_TS _T("\n"), st_to_string(vi.format->sampleType));
-			_ftprintf(stderr, _T("Bits: %d\n"), vi.format->bitsPerSample);
-			_ftprintf(stderr, _T("SubSampling W: %d\n"), vi.format->subSamplingW);
-			_ftprintf(stderr, _T("SubSampling H: %d\n"), vi.format->subSamplingH);
-		} else {
-			_fputts(_T("Format Name: Variable\n"), stderr);
-		}
-
+		print_vi(node.video_info());
 		return;
-	} else {
-		pipe_script(args, vsxx::VapourCoreRef{ vsscript_getCore(script.get()) }, node, out_file, tc_file);
 	}
+
+	pipe_script(args, vsxx::VapourCoreRef{ vsscript_getCore(script.get()) }, node, out_file, tc_file);
 
 	auto end_time = std::chrono::high_resolution_clock::now();
 
@@ -797,7 +797,7 @@ int _tmain(int argc, _TCHAR **argv)
 			} else if (!have_in_path && *arg != _T('-')) {
 				args.in_path = arg;
 				have_in_path = true;
-			} else if (!have_out_path && *arg != _T('-')) {
+			} else if (!have_out_path && (MATCH("-") || *arg != _T('-'))) {
 				args.out_path = arg;
 				have_out_path = true;
 			} else {
