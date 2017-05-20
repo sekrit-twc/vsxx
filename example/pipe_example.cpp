@@ -363,10 +363,13 @@ void write_y4m_header(FILE *file, const ::VSVideoInfo &vi)
 			switch (vi.format->bitsPerSample) {
 			case 16:
 				y4m_format += 'h';
+				break;
 			case 32:
 				y4m_format += 's';
+				break;
 			case 64:
 				y4m_format += 'd';
+				break;
 			default:
 				break;
 			}
