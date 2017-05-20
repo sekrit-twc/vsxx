@@ -218,6 +218,7 @@ void print_version()
 	try {
 		VSScriptGuard vss;
 		vsxx::VapourCoreOwner core = vsxx::VapourCoreOwner::create(1);
+		_ftprintf(stdout, _T("%") FMT_S, core.core_info().versionString); // versionString ends in newline.
 	} catch (const ScriptError &e) {
 		_ftprintf(stderr, _T("%") FMT_S _T("\n"), e.what());
 		std::exit(EXIT_FAILURE);
@@ -470,7 +471,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 {
 	const ::VSVideoInfo &vi = node.video_info();
 
-	const int num_requests = args.num_requests <= 0 ? core.core_info()->numThreads : args.num_requests;
+	const int num_requests = args.num_requests <= 0 ? core.core_info().numThreads : args.num_requests;
 	const int start_frame = args.start_frame;
 	const int end_frame = args.end_frame < 0 ? node.video_info().numFrames : args.end_frame;
 
