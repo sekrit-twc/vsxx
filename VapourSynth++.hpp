@@ -380,7 +380,7 @@ public:
 
 		T ret = MapGetProp<T>::get(get(), key, index, &error);
 		if (error)
-			return error_policy(ret, key, static_cast<VSGetPropErrors>(error));
+			return error_policy(ret, key, static_cast<::VSGetPropErrors>(error));
 
 		return ret;
 	}
