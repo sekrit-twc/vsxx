@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <exception>
 #include <map>
 #include <memory>
@@ -495,9 +496,9 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 	std::mutex mutex;
 	std::condition_variable cv;
 	std::map<int, vsxx::ConstVideoFrame> queue;
-	std::atomic_int active_requests = 0;
-	std::atomic_int callback_lock = 0;
-	std::atomic_bool error_flag = false;
+	std::atomic_int active_requests{ 0 };
+	std::atomic_int callback_lock{ 0 };
+	std::atomic_bool error_flag{ false };
 
 	std::exception_ptr eptr;
 	std::mutex eptr_mutex;
