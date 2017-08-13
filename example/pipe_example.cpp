@@ -477,7 +477,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 
 	const int num_requests = args.num_requests <= 0 ? core.core_info().numThreads : args.num_requests;
 	const int start_frame = args.start_frame;
-	const int end_frame = args.end_frame < 0 ? node.video_info().numFrames : args.end_frame;
+	const int end_frame = args.end_frame < 0 ? node.video_info().numFrames - 1 : args.end_frame;
 
 	if (!isConstantFormat(&vi))
 		throw ScriptError{ "cannot output node with variable format" };
@@ -544,7 +544,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 			++active_requests;
 		}
 
-		while (!error_flag && output_cur < end_frame) {
+		while (!error_flag && output_cur <= end_frame) {
 			std::unique_lock<std::mutex> lock{ mutex };
 
 			while (!queue.empty() && queue.begin()->first == output_cur) {
@@ -562,14 +562,14 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 					double fps = fps_counter.update();
 
 					if (std::isnan(fps))
-						_ftprintf(stderr, _T("Frame: %d/%d\r"), output_cur - start_frame + 1, end_frame - start_frame);
+						_ftprintf(stderr, _T("Frame: %d/%d\r"), output_cur - start_frame + 1, end_frame - start_frame + 1);
 					else
-						_ftprintf(stderr, _T("Frame: %d/%d (%.2f fps)\r"), output_cur - start_frame, end_frame - start_frame, fps);
+						_ftprintf(stderr, _T("Frame: %d/%d (%.2f fps)\r"), output_cur - start_frame + 1, end_frame - start_frame + 1, fps);
 				}
 
 				++output_cur;
 
-				if (requested_cur < end_frame) {
+				if (requested_cur <= end_frame) {
 					node.get_frame_async(requested_cur++, frame_done_callback);
 					++active_requests;
 				}
@@ -577,7 +577,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 				lock.lock();
 			}
 
-			if (!error_flag && output_cur < end_frame)
+			if (!error_flag && output_cur <= end_frame)
 				cv.wait(lock);
 		}
 	} catch (...) {
@@ -680,7 +680,7 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 	if (args.progress)
 		_fputts(_T("\n"), stdout);
 
-	_ftprintf(stderr, _T("Output %d frames in %.2f seconds (%.2f fps)\n"), end_frame - args.start_frame, elapsed, fps);
+	_ftprintf(stderr, _T("Output %d frames in %.2f seconds (%.2f fps)\n"), end_frame - args.start_frame + 1, elapsed, fps);
 }
 
 void run(const Arguments &args)
