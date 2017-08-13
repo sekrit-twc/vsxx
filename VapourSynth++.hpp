@@ -793,10 +793,11 @@ inline int detail::MapSetProp<FilterNode>::set(::VSMap *map, const char *key, co
 // Reference counted wrapper for VSFuncRef.
 // Calls VSAPI::cloneFuncRef on copy and VSAPI::freeFunc on destruction.
 class FilterFunc {
-	::VSFuncRef *m_func;
 public:
 	typedef std::function<void(const ConstPropertyMap &, const PropertyMap &, const VapourCore &)> callback_type;
 private:
+	::VSFuncRef *m_func;
+
 	static void VS_CC filter_func_callback(const ::VSMap *in, ::VSMap *out, void *user_data, ::VSCore *core, const ::VSAPI *vsapi);
 public:
 	static FilterFunc create(const callback_type &callback, const VapourCore &core);
