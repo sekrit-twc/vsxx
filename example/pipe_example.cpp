@@ -341,7 +341,7 @@ void write_y4m_header(FILE *file, const ::VSVideoInfo &vi)
 			y4m_format = "422";
 			break;
 		case SUBSAMPLE(0, 0):
-			y4m_format = "420";
+			y4m_format = "444";
 			break;
 		case SUBSAMPLE(2, 2):
 			y4m_format = "410";
