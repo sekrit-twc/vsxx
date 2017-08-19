@@ -136,7 +136,7 @@ public:
 int VSScriptGuard::s_count;
 
 struct FileCloser{
-	void operator()(::FILE *file)
+	void operator()(FILE *file)
 	{
 		if (file)
 			std::fclose(file);
@@ -395,7 +395,7 @@ void write_timecodes_header(FILE *file)
 	}
 }
 
-void write_frame(bool y4m, int n, const vsxx::ConstVideoFrame &frame, FILE *out_file)
+void write_frame(bool y4m, int n, const vsxx::ConstVideoFrame &frame, std::vector<char> &tmp, FILE *out_file)
 {
 	static const int gbr_order[] = { 1, 2, 0 };
 
@@ -406,6 +406,15 @@ void write_frame(bool y4m, int n, const vsxx::ConstVideoFrame &frame, FILE *out_
 		throw ScriptError{ "write failed" };
 	}
 
+	size_t size = 0;
+
+	for (int p = 0; p < format.numPlanes; ++p) {
+		size += static_cast<size_t>(frame.width(p)) * frame.height(p) * format.bytesPerSample;
+	}
+
+	tmp.reserve(size);
+	tmp.clear();
+
 	for (int p = 0; p < format.numPlanes; ++p) {
 		int src_plane = format.colorFamily == cmRGB ? gbr_order[p] : p;
 
@@ -415,21 +424,21 @@ void write_frame(bool y4m, int n, const vsxx::ConstVideoFrame &frame, FILE *out_
 		int stride = frame.stride(src_plane);
 
 		for (int i = 0; i < height; ++i) {
-			const uint8_t *buf = read_ptr;
-			size_t n = width * format.bytesPerSample;
-
-			while (n) {
-				size_t ret = std::fwrite(buf, 1, n, out_file);
-				if (ret != n && std::ferror(out_file)) {
-					_tperror(_T("failed to write output"));
-					throw ScriptError{ "write failed" };
-				}
-				buf += ret;
-				n -= ret;
-			}
-
+			tmp.insert(tmp.end(), read_ptr, read_ptr + width * format.bytesPerSample);
 			read_ptr += stride;
 		}
+	}
+
+	char *buf = tmp.data();
+	while (size) {
+		size_t ret = std::fwrite(buf, 1, size, out_file);
+		if (ret != size && std::ferror(out_file)) {
+			_tperror(_T("failed to write output"));
+			throw ScriptError{ "write failed" };
+		}
+
+		size -= ret;
+		buf += ret;
 	}
 }
 
@@ -532,6 +541,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 
 	try {
 		FpsCounter fps_counter;
+		std::vector<char> tmp;
 
 		int requested_cur = start_frame;
 		int output_cur = start_frame;
@@ -554,7 +564,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 				lock.unlock();
 
 				if (out_file)
-					write_frame(args.y4m, output_cur, frame, out_file);
+					write_frame(args.y4m, output_cur, frame, tmp, out_file);
 				if (tc_file)
 					write_timecodes(&tc_num, &tc_den, output_cur, frame, tc_file);
 
