@@ -1154,8 +1154,14 @@ public:
 		if (!get_vsapi())
 			set_vsapi(vsapi);
 
-		FilterBase *filter = new Derived{ user_data };
-		filter->create_filter(ConstPropertyMapRef{ in }, PropertyMapRef{ out }, VapourCoreRef{ core });
+		try {
+			FilterBase *filter = new Derived{ user_data };
+			filter->create_filter(ConstPropertyMapRef{ in }, PropertyMapRef{ out }, VapourCoreRef{ core });
+		} catch (const std::exception &e) {
+			vsapi->setError(out, e.what());
+		} catch (...) {
+			vsapi->setError(out, "unknown C++ exception");
+		}
 	}
 
 	FilterBase(const FilterBase &) = delete;
