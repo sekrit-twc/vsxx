@@ -891,6 +891,12 @@ public:
 	{
 		return PropertyMapOwner{ get_vsapi()->invoke(get(), name, args.get()) };
 	}
+
+	// VSAPI::getPluginPath
+	const char *path() const noexcept
+	{
+		return get_vsapi()->getPluginPath(m_plugin);
+	}
 };
 
 
