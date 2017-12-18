@@ -334,7 +334,7 @@ public:
 	// VSAPI::clearMap.
 	template <class T = Map,
 	          typename std::enable_if<!std::is_const<T>::value, int>::type = 0>
-	void clear() noexcept
+	void clear() const noexcept
 	{
 		get_vsapi()->clearMap(m_map);
 	}
@@ -388,7 +388,7 @@ public:
 	// VSAPI::propDeleteKey.
 	template <class T = Map,
 	          typename std::enable_if<!std::is_const<T>::value, int>::type = 0>
-	void erase(const char *key) noexcept
+	void erase(const char *key) const noexcept
 	{
 		get_vsapi()->propDeleteKey(get(), key);
 	}
