@@ -1077,12 +1077,15 @@ class FilterBase {
 
 	void create_filter(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) noexcept
 	{
+		bool initialized = false;
+
 		try {
 			std::pair<VSFilterMode, int> flags = init(in, out, core);
 
 			get_vsapi()->createFilter(in.get(), out.get(), get_name(0),
 			                          &FilterBase::filter_init, &FilterBase::filter_get_frame, &FilterBase::filter_free,
 			                          flags.first, flags.second, this, core.get());
+			initialized = true;
 			post_init(in, out, core);
 		} catch (const std::exception &e) {
 			std::string err_msg;
@@ -1101,7 +1104,7 @@ class FilterBase {
 		}
 
 		// If the filter creation fails, the core will not call VSFilterFree.
-		if (out.get_error())
+		if (!initialized && out.get_error())
 			delete this;
 	}
 
