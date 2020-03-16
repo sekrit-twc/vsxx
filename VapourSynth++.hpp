@@ -914,9 +914,11 @@ public:
 	::VSCore *get() const noexcept { return m_core; }
 
 	// VSAPI::getCoreInfo.
-	const ::VSCoreInfo &core_info() const noexcept
+	::VSCoreInfo core_info() const noexcept
 	{
-		return *get_vsapi()->getCoreInfo(get());
+		::VSCoreInfo info;
+		get_vsapi()->getCoreInfo2(get(), &info);
+		return info;
 	}
 
 	// VSAPI::newVideoFrame.
