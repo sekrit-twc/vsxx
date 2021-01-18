@@ -871,6 +871,7 @@ public:
 	{
 	}
 
+	explicit operator bool() const noexcept { return get() != nullptr; }
 	::VSPlugin *get() const noexcept { return m_plugin; }
 
 	// VSAPI::getFunctions.
