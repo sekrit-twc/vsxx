@@ -323,7 +323,7 @@ std::unique_ptr<::VSScript, VSScriptDelete> create_script(const Arguments &args)
 	return script;
 }
 
-void write_y4m_header(FILE *file, const ::VSVideoInfo &vi)
+void write_y4m_header(FILE *file, const ::VSVideoInfo &vi, int length)
 {
 	std::string y4m_format;
 
@@ -380,7 +380,7 @@ void write_y4m_header(FILE *file, const ::VSVideoInfo &vi)
 	}
 
 	if (fprintf(file, "YUV4MPEG2 C%s W%d H%d F%" PRId64 ":%" PRId64 " Ip A0:0 XLENGTH=%d\n",
-	            y4m_format.c_str(), vi.width, vi.height, vi.fpsNum, vi.fpsDen, vi.numFrames) < 0)
+	            y4m_format.c_str(), vi.width, vi.height, vi.fpsNum, vi.fpsDen, length) < 0)
 	{
 		_tperror(_T("failed to write output"));
 		throw ScriptError{ "write failed" };
@@ -498,7 +498,7 @@ void pipe_script(const Arguments &args, const vsxx::VapourCore &core, const vsxx
 	}
 
 	if (out_file && args.y4m)
-		write_y4m_header(out_file, vi);
+		write_y4m_header(out_file, vi, end_frame - start_frame);
 	if (tc_file)
 		write_timecodes_header(tc_file);
 
