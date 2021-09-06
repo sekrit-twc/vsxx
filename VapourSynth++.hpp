@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef VAPOURSYNTHXX_HPP_
 #define VAPOURSYNTHXX_HPP_
 

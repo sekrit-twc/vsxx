@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef VSXX_PLUGINMAIN_H_
 #define VSXX_PLUGINMAIN_H_
 
