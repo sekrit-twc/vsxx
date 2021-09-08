@@ -3,12 +3,14 @@
 
 using namespace vsxx;
 
+namespace {
+
 class InvertFilter : public FilterBase {
 	FilterNode m_node;
 	VSVideoInfo m_vi;
 	bool m_enabled;
 public:
-	InvertFilter(void * = nullptr) : m_vi(), m_enabled{} {}
+	InvertFilter(void * = nullptr) : m_vi{}, m_enabled{} {}
 
 	const char *get_name(int) noexcept override
 	{
@@ -68,6 +70,9 @@ public:
 		return dst;
 	}
 };
+
+} // namespace
+
 
 const PluginInfo g_plugin_info = {
 	"com.example.invert", "invert", "VapourSynth Invert Example", {
