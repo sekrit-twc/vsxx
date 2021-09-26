@@ -19,11 +19,11 @@
 
 // MSVC wfprintf incorrectly handles 's' format types.
 #ifdef _UNICODE
-#define FMT_S _T("S")
-#define FMT_TS _T("Ts")
+#define FMT_S "S"
+#define FMT_TS "Ts"
 #else
-#define FMT_S _T("s")
-#define FMT_TS _T("s")
+#define FMT_S "s"
+#define FMT_TS "s"
 #endif
 
 #define __ORDER_BIG_ENDIAN__ 1234
@@ -247,9 +247,9 @@ void print_version()
 	try {
 		VSScriptLibrary::ensure();
 		vsxx4::CoreInstance core = vsxx4::CoreInstance::create();
-		_ftprintf(stdout, _T("%") FMT_S, core.core_info().versionString); // versionString ends in newline.
+		_ftprintf(stdout, _T("%" FMT_S), core.core_info().versionString); // versionString ends in newline.
 	} catch (const ScriptError &e) {
-		_ftprintf(stderr, _T("%") FMT_S _T("\n"), e.what());
+		_ftprintf(stderr, _T("%" FMT_S "\n"), e.what());
 		std::exit(EXIT_FAILURE);
 	}
 }
@@ -265,7 +265,7 @@ std::string tstring_to_utf8(const tstring &tstr)
 		tstr.c_str(), static_cast<int>(tstr.size()), &s[0], static_cast<int>(s.size()),
 		nullptr, nullptr)))
 	{
-		_ftprintf(stderr, _T("invalid unicode string: %") FMT_TS _T("\n"), tstr.c_str());
+		_ftprintf(stderr, _T("invalid unicode string: %" FMT_TS "\n"), tstr.c_str());
 		throw ScriptError{ "failed to decode string" };
 	}
 
@@ -691,7 +691,7 @@ void write_timecodes(int64_t *tc_num, int64_t *tc_den, int n, const vsxx4::Const
 		int64_t dur_den = props.get_prop<int64_t>("_DurationDen");
 
 		if (dur_num <= 0 || dur_den <= 0) {
-			_ftprintf(stderr, _T("bad duration %") _T(PRId64) _T("/%") _T(PRId64) _T(" at frame %d\n"),
+			_ftprintf(stderr, _T("bad duration %" PRId64 "/%" PRId64 " at frame %d\n"),
 				dur_num, dur_den, n);
 			throw ScriptError{ "bad duration value" };
 		}
@@ -735,7 +735,7 @@ void pipe_video(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 		throw ScriptError{ "cannot output node with variable format" };
 
 	if (start_frame > vi.numFrames || end_frame > vi.numFrames) {
-		_ftprintf(stderr, _T("requested frame range [%") _T(PRId64) _T("-%") _T(PRId64) _T(") not in script(%d frames)\n"),
+		_ftprintf(stderr, _T("requested frame range [%" PRId64 "-%" PRId64 ") not in script(%d frames)\n"),
 			args.start_frame_or_sample, args.end_frame_or_sample, vi.numFrames);
 		throw ScriptError{ "invalid range of frames" };
 	}
@@ -774,7 +774,7 @@ void pipe_video(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 				error_flag = true;
 			}
 		} else {
-			_ftprintf(stderr, _T("frame %d failed: %") FMT_S _T("\n"), n, error);
+			_ftprintf(stderr, _T("frame %d failed: %" FMT_S "\n"), n, error);
 			error_flag = true;
 		}
 
@@ -874,7 +874,7 @@ void pipe_audio(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 		throw ScriptError{ "invalid range of samples" };
 
 	if (start_sample > ai.numSamples || end_sample > ai.numSamples) {
-		_ftprintf(stderr, _T("requested sample range [%") _T(PRId64) _T("-%") _T(PRId64) _T(") not in script(%") _T(PRId64) _T(" samples)\n"),
+		_ftprintf(stderr, _T("requested sample range [%" PRId64 "-%" PRId64 ") not in script(%" PRId64 " samples)\n"),
 			args.start_frame_or_sample, args.end_frame_or_sample, ai.numSamples);
 		throw ScriptError{ "invalid range of samples" };
 	}
@@ -916,9 +916,9 @@ void pipe_audio(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 			double fps = fps_counter.update();
 
 			if (std::isnan(fps)) {
-				_ftprintf(stderr, _T("Sample: %") _T(PRId64) _T("/%") _T(PRId64) _T("\r"), static_cast<int64_t>(n) * VS_AUDIO_FRAME_SAMPLES, ai.numSamples);
+				_ftprintf(stderr, _T("Sample: %" PRId64 "/%" PRId64 "\r"), static_cast<int64_t>(n) * VS_AUDIO_FRAME_SAMPLES, ai.numSamples);
 			} else if (n % 100) {
-				_ftprintf(stderr, _T("Sample: %") _T(PRId64) _T("/%") _T(PRId64) _T("(% .2f sps)\r"),
+				_ftprintf(stderr, _T("Sample: %" PRId64 "/%" PRId64 "(%.2f sps)\r"),
 					static_cast<int64_t>(n) * VS_AUDIO_FRAME_SAMPLES, ai.numSamples, fps * VS_AUDIO_FRAME_SAMPLES);
 			}
 		}
@@ -938,7 +938,7 @@ void print_vi(const VSVideoInfo &vi)
 	_ftprintf(stderr, _T("Frames: %d\n"), vi.numFrames);
 
 	if (vi.fpsNum && vi.fpsDen) {
-		_ftprintf(stderr, _T("FPS: %") _T(PRId64) _T("/%") _T(PRId64) _T(" (%.3f fps)\n"),
+		_ftprintf(stderr, _T("FPS: %" PRId64 "/%" PRId64 " (%.3f fps)\n"),
 			vi.fpsNum, vi.fpsDen, static_cast<double>(vi.fpsNum) / vi.fpsDen);
 	} else {
 		_fputts(_T("FPS: Variable\n"), stderr);
@@ -946,12 +946,12 @@ void print_vi(const VSVideoInfo &vi)
 
 	if (vi.format.colorFamily != cfUndefined) {
 		char name[32];
-		int err = vsxx4::get_vsapi()->getVideoFormatName(&vi.format, name);
-		assert(!err);
+		int res = vsxx4::get_vsapi()->getVideoFormatName(&vi.format, name);
+		assert(res);
 
-		_ftprintf(stderr, _T("Format Name: %") FMT_S _T("\n"), name);
-		_ftprintf(stderr, _T("Color Family: %") FMT_TS _T("\n"), cf_to_string(static_cast<VSColorFamily>(vi.format.colorFamily)));
-		_ftprintf(stderr, _T("Sample Type: %") FMT_TS _T("\n"), st_to_string(static_cast<VSSampleType>(vi.format.sampleType)));
+		_ftprintf(stderr, _T("Format Name: %" FMT_S "\n"), name);
+		_ftprintf(stderr, _T("Color Family: %" FMT_TS "\n"), cf_to_string(static_cast<VSColorFamily>(vi.format.colorFamily)));
+		_ftprintf(stderr, _T("Sample Type: %" FMT_TS "\n"), st_to_string(static_cast<VSSampleType>(vi.format.sampleType)));
 		_ftprintf(stderr, _T("Bits: %d\n"), vi.format.bitsPerSample);
 		_ftprintf(stderr, _T("SubSampling W: %d\n"), vi.format.subSamplingW);
 		_ftprintf(stderr, _T("SubSampling H: %d\n"), vi.format.subSamplingH);
@@ -968,8 +968,8 @@ void print_ai(const VSAudioInfo &ai)
 
 	_ftprintf(stderr, _T("Samples: %" PRId64 "\n"), ai.numSamples);
 	_ftprintf(stderr, _T("Sample Rate: %d\n"), ai.sampleRate);
-	_ftprintf(stderr, _T("Format Name: %") FMT_S _T("\n"), name);
-	_ftprintf(stderr, _T("Sample Type: %") FMT_TS _T("\n"), st_to_string(static_cast<VSSampleType>(ai.format.sampleType)));
+	_ftprintf(stderr, _T("Format Name: %" FMT_S "\n"), name);
+	_ftprintf(stderr, _T("Sample Type: %" FMT_TS "\n"), st_to_string(static_cast<VSSampleType>(ai.format.sampleType)));
 	_ftprintf(stderr, _T("Bits: %d\n"), ai.format.bitsPerSample);
 	_ftprintf(stderr, _T("Channels: %d\n"), ai.format.numChannels);
 	_ftprintf(stderr, _T("Layout: %" PRIx64 "\n"), ai.format.channelLayout); // FIXME
@@ -986,7 +986,7 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 	auto script = create_script(args);
 
 	if (vss->evaluateFile(script.get(), tstring_to_utf8(args.in_path).c_str())) {
-		_ftprintf(stderr, _T("script evaluation failed: %") FMT_S _T("\n"), vss->getError(script.get()));
+		_ftprintf(stderr, _T("script evaluation failed: %" FMT_S "\n"), vss->getError(script.get()));
 		throw ScriptError{ "failed to evaluate script" };
 	}
 
@@ -995,7 +995,7 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 
 	vsxx4::FilterNode node{ vss->getOutputNode(script.get(), args.out_idx) };
 	if (!node) {
-		_ftprintf(stderr, _T("invalid output index: %") FMT_S _T(" %d\n"), vss->getError(script.get()), args.out_idx);
+		_ftprintf(stderr, _T("invalid output index: %" FMT_S " %d\n"), vss->getError(script.get()), args.out_idx);
 		throw ScriptError{ "failed to get output" };
 	}
 
@@ -1115,10 +1115,10 @@ int _tmain(int argc, _TCHAR **argv)
 				try {
 					out = std::stoi(tstring(argv[n]));
 				} catch (const std::invalid_argument &) {
-					_ftprintf(stderr, _T("error parsing value as integer: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("error parsing value as integer: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				} catch (const std::out_of_range &) {
-					_ftprintf(stderr, _T("integer out of range: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("integer out of range: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				}
 			};
@@ -1129,10 +1129,10 @@ int _tmain(int argc, _TCHAR **argv)
 				try {
 					out = std::stoll(tstring(argv[n]));
 				} catch (const std::invalid_argument &) {
-					_ftprintf(stderr, _T("error parsing value as integer: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("error parsing value as integer: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				} catch (const std::out_of_range &) {
-					_ftprintf(stderr, _T("integer out of range: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("integer out of range: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				}
 			};
@@ -1154,7 +1154,7 @@ int _tmain(int argc, _TCHAR **argv)
 				split_idx = key.find('=');
 
 				if (split_idx == tstring::npos) {
-					_ftprintf(stderr, _T("bad script argument: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("bad script argument: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				}
 
@@ -1180,7 +1180,7 @@ int _tmain(int argc, _TCHAR **argv)
 				} else if (!_tcscmp(_T("w64"), argv[n])) {
 					args.mode = OutputMode::WAVE64;
 				} else {
-					_ftprintf(stderr, _T("unknown parameter to --container: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("unknown parameter to --container: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				}
 			} else if (MATCH("-t") || MATCH("--timecodes")) {
@@ -1202,7 +1202,7 @@ int _tmain(int argc, _TCHAR **argv)
 					args.reflection = true;
 					args.verbose_reflection = true;
 				} else {
-					_ftprintf(stderr, _T("unknown parameter to --graph: %") FMT_TS _T("\n"), argv[n]);
+					_ftprintf(stderr, _T("unknown parameter to --graph: %" FMT_TS "\n"), argv[n]);
 					throw BadCommandLine{};
 				}
 			} else if (!have_in_path && *arg != _T('-')) {
@@ -1212,7 +1212,7 @@ int _tmain(int argc, _TCHAR **argv)
 				args.out_path = arg;
 				have_out_path = true;
 			} else {
-				_ftprintf(stderr, _T("unknown argument: %") FMT_TS _T("\n"), arg);
+				_ftprintf(stderr, _T("unknown argument: %" FMT_TS "\n"), arg);
 				throw BadCommandLine{};
 			}
 #undef MATCH
@@ -1230,17 +1230,17 @@ int _tmain(int argc, _TCHAR **argv)
 		print_help();
 		return EXIT_FAILURE;
 	} catch (const std::exception &e) {
-		_ftprintf(stderr, _T("C++ exception: %") FMT_S _T("\n"), e.what());
+		_ftprintf(stderr, _T("C++ exception: %" FMT_S "\n"), e.what());
 		return EXIT_FAILURE;
 	}
 
 	try {
 		run(args);
 	} catch (const ScriptError &e) {
-		_ftprintf(stderr, _T("%") FMT_S _T("\n"), e.what());
+		_ftprintf(stderr, _T("%" FMT_S "\n"), e.what());
 		return EXIT_FAILURE;
 	} catch (const std::exception &e) {
-		_ftprintf(stderr, _T("C++ exception: %") FMT_S _T("\n"), e.what());
+		_ftprintf(stderr, _T("C++ exception: %" FMT_S "\n"), e.what());
 		return EXIT_FAILURE;
 	}
 
