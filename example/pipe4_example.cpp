@@ -984,6 +984,7 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 	auto script = create_script(args);
+	vss->evalSetWorkingDir(script.get(), 1);
 
 	if (vss->evaluateFile(script.get(), tstring_to_utf8(args.in_path).c_str())) {
 		_ftprintf(stderr, _T("script evaluation failed: %" FMT_S "\n"), vss->getError(script.get()));
