@@ -3,6 +3,9 @@
 #include <cassert>
 #include <chrono>
 #include <cinttypes>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <map>
 #include <mutex>
 #include <string>
@@ -22,8 +25,13 @@
 #define FMT_S _T("s")
 #define FMT_TS _T("s")
 #endif
+
+#define __ORDER_BIG_ENDIAN__ 1234
+#define __ORDER_LITTLE_ENDIAN__ 4321
+#define __BYTE_ORDER__ __ORDER_LITTLE_ENDIAN__
 #else
 #include <dlfcn.h>
+#include <endian.h>
 
 #define _fputts std::fputs
 #define _tcscmp std::strcmp
@@ -67,8 +75,8 @@ struct Arguments {
 	tstring tc_path;
 	std::unordered_multimap<tstring, tstring> script_args;
 	OutputMode mode = OutputMode::RAW;
-	int start_frame = 0;
-	int end_frame = -1;
+	int64_t start_frame_or_sample = 0;
+	int64_t end_frame_or_sample = -1;
 	int out_idx = 0;
 	int num_requests = 0;
 	bool help = false;
@@ -407,6 +415,125 @@ void write_y4m_header(FILE *file, const VSVideoInfo &vi, int length)
 	}
 }
 
+struct WAVEFORMATEXTENSIBLE {
+	uint8_t  wFormatTag[2];
+	uint16_t nChannels;
+	uint32_t nSamplesPerSec;
+	uint32_t nAvgBytesPerSec;
+	uint16_t nBlockAlign;
+	uint16_t wBitsPerSample;
+	uint16_t cbSize;
+	uint16_t wValidBitsPerSample;
+	uint32_t dwChannelMask;
+	uint8_t  SubFormat[16];
+};
+static_assert(offsetof(WAVEFORMATEXTENSIBLE, wValidBitsPerSample) == sizeof(WAVEFORMATEXTENSIBLE) - 22, "wrong offset");
+
+constexpr uint16_t le16(uint16_t x)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	return x;
+#else
+	return ((x >> 8) & 0x00FF) | ((x << 8) & 0xFF00);
+#endif
+}
+
+constexpr uint32_t le32(uint32_t x)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	return x;
+#else
+	return ((x >> 24) & 0x000000FF) | ((x >> 8) & 0x0000FF00) | ((x << 8) & 0x00FF0000) | ((x << 24) & 0xFF000000);
+#endif
+}
+
+constexpr uint64_t le64(uint64_t x)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	return x;
+#else
+	return static_cast<uint64_t>(le32(static_cast<uint32_t>(x >> 32))) |
+		(static_cast<uint64_t>(le32(static_cast<uint32_t>(x))) << 32);
+#endif
+}
+
+unsigned audio_bytes_per_sample(const VSAudioFormat &fmt) { return (fmt.bitsPerSample + 7) / 8; }
+
+void init_wave_format_ex(WAVEFORMATEXTENSIBLE &ex, const VSAudioInfo &ai)
+{
+	if (ai.format.channelLayout & 0xFFFFFFFF00000000)
+		throw ScriptError{ "Channel type can not be represented in WAVEFORMATEX" };
+
+	ex.wFormatTag[0] = 0xFE; ex.wFormatTag[1] = 0xFF;
+	ex.nChannels = le16(static_cast<uint16_t>(ai.format.numChannels));
+	ex.nSamplesPerSec = le32(ai.sampleRate);
+	ex.nAvgBytesPerSec = le32(audio_bytes_per_sample(ai.format) * ai.format.numChannels * ai.sampleRate);
+	ex.wBitsPerSample = le16(static_cast<uint16_t>(audio_bytes_per_sample(ai.format) * 8));
+	ex.cbSize = le16(22);
+	ex.wValidBitsPerSample = le16(static_cast<uint16_t>(ai.format.bitsPerSample));
+	ex.dwChannelMask = le32(static_cast<uint32_t>(ai.format.channelLayout));
+
+	constexpr uint8_t pcm_guid[16] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 };
+	constexpr uint8_t ieee_guid[16] = { 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 };
+	std::memcpy(ex.SubFormat, ai.format.sampleType == stFloat ? ieee_guid : pcm_guid, sizeof(pcm_guid));
+}
+
+uint64_t audio_data_size(const VSAudioInfo &ai)
+{
+	return static_cast<size_t>(audio_bytes_per_sample(ai.format)) * ai.format.numChannels * ai.numSamples;
+}
+
+void write_wave_header(FILE *file, const VSAudioInfo &ai)
+{
+	struct {
+		uint8_t riff[4] = { 'R', 'I', 'F', 'F' };
+		uint32_t riff_size = 0;
+		uint8_t wave[4] = { 'W', 'A', 'V', 'E' };
+		uint8_t fmt[4] = { 'f', 'm', 't', '.' };
+		uint32_t fmt_size = le32(sizeof(WAVEFORMATEXTENSIBLE));
+		WAVEFORMATEXTENSIBLE ex = {};
+		uint8_t data[4] = { 'd', 'a', 't', 'a' };
+		uint32_t data_size = 0;
+	} wave;
+	static_assert(sizeof(wave) == 68, "wrong header size");
+
+	uint64_t sz = audio_data_size(ai);
+	if (sz > UINT32_MAX - sizeof(wave))
+		throw ScriptError{ "WAV file size is limited to 4 GB" };
+
+	wave.riff_size = le32(static_cast<uint32_t>(sz - (sizeof(wave) - (sizeof(wave.riff) + sizeof(wave.riff_size)))));
+	wave.data_size = le32(static_cast<uint32_t>(sz));
+
+	init_wave_format_ex(wave.ex, ai);
+
+	if (fwrite(&wave, sizeof(wave), 1, file) != 1)
+		throw ScriptError{ "error writing WAV header" };
+}
+
+void write_wave64_header(FILE *file, const VSAudioInfo &ai)
+{
+	struct {
+		uint8_t riff_guid[16] = { 0x72, 0x69, 0x66, 0x66, 0x2E, 0x91, 0xCF, 0x11, 0xA5, 0xD6, 0x28, 0xDB, 0x04, 0xC1, 0x00, 0x00 };
+		uint64_t riff_size;
+		uint8_t wave_guid[16] = { 0x77, 0x61, 0x76, 0x65, 0xF3, 0xAC, 0xD3, 0x11, 0x8C, 0xD1, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
+		uint8_t fmt_guid[16] = { 0x66, 0x6D, 0x74, 0x20, 0xF3, 0xAC, 0xD3, 0x11, 0x8C, 0xD1, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
+		uint64_t fmt_size = le64(sizeof(WAVEFORMATEXTENSIBLE) + sizeof(fmt_guid) + sizeof(fmt_size));
+		WAVEFORMATEXTENSIBLE ex = {};
+		uint8_t data_guid[16] = { 0x64, 0x61, 0x74, 0x61, 0xF3, 0xAC, 0xD3, 0x11, 0x8C, 0xD1, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
+		uint64_t data_size;
+	} wave64;
+	static_assert(sizeof(wave64) == 128, "wrong header size");
+
+	uint64_t sz = audio_data_size(ai);
+	wave64.riff_size = le64(sz + sizeof(wave64));
+	wave64.data_size = le64(sz + sizeof(wave64.data_guid) + sizeof(wave64.data_size));
+
+	init_wave_format_ex(wave64.ex, ai);
+
+	if (fwrite(&wave64, sizeof(wave64), 1, file) != 1)
+		throw ScriptError{ "error writing W64 header" };
+}
+
 void write_timecodes_header(FILE *file)
 {
 	if (fputs("# timecode format v2\n", file) < 0) {
@@ -415,7 +542,21 @@ void write_timecodes_header(FILE *file)
 	}
 }
 
-void write_video_frame(OutputMode mode, int n, const vsxx4::ConstFrame &frame, const vsxx4::ConstFrame &alpha, std::vector<char> &tmp, FILE *out_file)
+void write_all(const uint8_t *buf, FILE *file, size_t n)
+{
+	while (n) {
+		size_t ret = std::fwrite(buf, 1, n, file);
+		if (ret != n && std::ferror(file)) {
+			_tperror(_T("failed to write output"));
+			throw ScriptError{ "write failed" };
+		}
+
+		n -= ret;
+		buf += ret;
+	}
+}
+
+void write_video_frame(OutputMode mode, int n, const vsxx4::ConstFrame &frame, const vsxx4::ConstFrame &alpha, std::vector<uint8_t> &tmp, FILE *out_file)
 {
 	assert(mode == OutputMode::RAW || mode == OutputMode::Y4M);
 	if (mode == OutputMode::Y4M && fputs("FRAME\n", out_file) < 0) {
@@ -469,7 +610,59 @@ void write_video_frame(OutputMode mode, int n, const vsxx4::ConstFrame &frame, c
 		}
 	}
 
-	char *buf = tmp.data();
+	write_all(tmp.data(), out_file, size);
+}
+
+void write_audio_frame(const vsxx4::ConstFrame &frame, std::vector<uint8_t> &tmp, FILE *out_file)
+{
+	const VSAudioFormat &format = frame.audio_format();
+
+	unsigned samples = frame.sample_length();
+	unsigned channels = format.numChannels;
+	unsigned bytes_per_sample = audio_bytes_per_sample(format);
+	size_t size = static_cast<size_t>(samples) * bytes_per_sample * channels;
+	const uint8_t *read_ptr = frame.read_ptr();
+
+	if (tmp.size() < size)
+		tmp.resize(size);
+
+	auto swizzle_16b = [](unsigned n, unsigned channels, const uint8_t *read_ptr, uint8_t *out)
+	{
+		for (size_t i = 0; i < n; ++i) {
+			for (size_t ch = 0; ch < channels; ++ch) {
+				reinterpret_cast<uint16_t *>(out)[i * channels + ch] = le16(reinterpret_cast<const uint16_t *>(read_ptr)[ch * VS_AUDIO_FRAME_SAMPLES + i]);
+			}
+		}
+	};
+	auto swizzle_24b = [](unsigned n, unsigned channels, const uint8_t *read_ptr, uint8_t *out)
+	{
+		for (size_t i = 0; i < n; ++i) {
+			for (size_t ch = 0; ch < channels; ++ch) {
+				uint32_t x = le32(reinterpret_cast<const uint32_t *>(read_ptr)[ch * VS_AUDIO_FRAME_SAMPLES + i]);
+				uint8_t *dst = out + (i * channels + ch) * 3;
+				std::memcpy(dst, &x, 3);
+			}
+		}
+	};
+	auto swizzle_32b = [](unsigned n, unsigned channels, const uint8_t *read_ptr, uint8_t *out)
+	{
+		for (size_t i = 0; i < n; ++i) {
+			for (size_t ch = 0; ch < channels; ++ch) {
+				reinterpret_cast<uint32_t *>(out)[i * channels + ch] = le32(reinterpret_cast<const uint32_t *>(read_ptr)[ch * VS_AUDIO_FRAME_SAMPLES + i]);
+			}
+		}
+	};
+
+	if (bytes_per_sample == 2)
+		swizzle_16b(samples, channels, read_ptr, tmp.data());
+	else if (bytes_per_sample == 3)
+		swizzle_24b(samples, channels, read_ptr, tmp.data());
+	else if (bytes_per_sample == 4)
+		swizzle_32b(samples, channels, read_ptr, tmp.data());
+	else
+		assert(false);
+
+	uint8_t *buf = tmp.data();
 	while (size) {
 		size_t ret = std::fwrite(buf, 1, size, out_file);
 		if (ret != size && std::ferror(out_file)) {
@@ -480,6 +673,8 @@ void write_video_frame(OutputMode mode, int n, const vsxx4::ConstFrame &frame, c
 		size -= ret;
 		buf += ret;
 	}
+
+	write_all(tmp.data(), out_file, size);
 }
 
 void write_timecodes(int64_t *tc_num, int64_t *tc_den, int n, const vsxx4::ConstFrame &frame, FILE *tc_file)
@@ -530,15 +725,18 @@ void pipe_video(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 	const ::VSVideoInfo &vi = node.video_info();
 
 	const int num_requests = args.num_requests <= 0 ? core.core_info().numThreads : args.num_requests;
-	const int start_frame = args.start_frame;
-	const int end_frame = args.end_frame < 0 ? node.video_info().numFrames - 1 : args.end_frame;
+	const int start_frame = static_cast<int>(args.start_frame_or_sample);
+	const int end_frame = args.end_frame_or_sample < 0 ? vi.numFrames - 1 : static_cast<int>(args.end_frame_or_sample);
+
+	if (end_frame < start_frame)
+		throw ScriptError{ "invalid range of frames" };
 
 	if (!vsh::isConstantVideoFormat(&vi))
 		throw ScriptError{ "cannot output node with variable format" };
 
 	if (start_frame > vi.numFrames || end_frame > vi.numFrames) {
-		_ftprintf(stderr, _T("requested frame range [%d-%d) not in script (%d frames)\n"),
-			args.start_frame, args.end_frame, vi.numFrames);
+		_ftprintf(stderr, _T("requested frame range [%") _T(PRId64) _T("-%") _T(PRId64) _T(") not in script(%d frames)\n"),
+			args.start_frame_or_sample, args.end_frame_or_sample, vi.numFrames);
 		throw ScriptError{ "invalid range of frames" };
 	}
 
@@ -586,7 +784,7 @@ void pipe_video(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 
 	try {
 		FpsCounter fps_counter;
-		std::vector<char> tmp;
+		std::vector<uint8_t> tmp;
 
 		int requested_cur = start_frame;
 		int output_cur = start_frame;
@@ -660,6 +858,71 @@ void pipe_video(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 		std::rethrow_exception(eptr);
 	if (error_flag)
 		throw ScriptError{ "piping failed" };
+}
+
+void pipe_audio(const Arguments &args, const vsxx4::Core &core, const vsxx4::FilterNode &node, FILE *out_file)
+{
+	if (args.mode != OutputMode::RAW && args.mode != OutputMode::WAVE && args.mode != OutputMode::WAVE64)
+		throw ScriptError{ "can only output video as raw or Y4M" };
+
+	const ::VSAudioInfo &ai = node.audio_info();
+	const int num_requests = args.num_requests <= 0 ? core.core_info().numThreads : args.num_requests;
+	const int64_t start_sample = args.start_frame_or_sample;
+	const int64_t end_sample = args.end_frame_or_sample < 0 ? ai.numSamples - 1 : args.end_frame_or_sample;
+
+	if (end_sample < start_sample)
+		throw ScriptError{ "invalid range of samples" };
+
+	if (start_sample > ai.numSamples || end_sample > ai.numSamples) {
+		_ftprintf(stderr, _T("requested sample range [%") _T(PRId64) _T("-%") _T(PRId64) _T(") not in script(%") _T(PRId64) _T(" samples)\n"),
+			args.start_frame_or_sample, args.end_frame_or_sample, ai.numSamples);
+		throw ScriptError{ "invalid range of samples" };
+	}
+
+	vsxx4::MapInstance trim_args = vsxx4::MapInstance::create();
+	trim_args.set_prop("clip", node);
+	trim_args.set_prop("first", start_sample);
+	trim_args.set_prop("last", end_sample);
+	vsxx4::FilterNode trim_node = core.get_plugin_by_namespace("std").invoke("AudioTrim", trim_args).get_prop<vsxx4::FilterNode>("clip");
+	const ::VSAudioInfo &trim_ai = trim_node.audio_info();
+
+	if (args.mode == OutputMode::WAVE)
+		write_wave_header(out_file, trim_ai);
+	else if (args.mode == OutputMode::WAVE64)
+		write_wave64_header(out_file, trim_ai);
+
+	// Enable cache for prefetch.
+	trim_node.set_cache_mode(1);
+
+	// Do output.
+	FpsCounter fps_counter;
+	std::vector<uint8_t> tmp;
+
+	// Bind nothing. Do nothing.
+	auto prefetch_cb = [](vsxx4::ConstFrame, int, const vsxx4::FilterNode &, const char *) {};
+
+	for (int n = 0; n < std::min(num_requests, trim_ai.numFrames); ++n) {
+		trim_node.get_frame_async(n, prefetch_cb);
+	}
+
+	for (int n = 0; n < trim_ai.numFrames; ++n) {
+		vsxx4::ConstFrame frame = trim_node.get_frame(n);
+		if (trim_ai.numFrames - n > num_requests)
+			trim_node.get_frame_async(n + num_requests, prefetch_cb);
+
+		write_audio_frame(frame, tmp, out_file);
+
+		if (args.progress) {
+			double fps = fps_counter.update();
+
+			if (std::isnan(fps)) {
+				_ftprintf(stderr, _T("Sample: %") _T(PRId64) _T("/%") _T(PRId64) _T("\r"), static_cast<int64_t>(n) * VS_AUDIO_FRAME_SAMPLES, ai.numSamples);
+			} else if (n % 100) {
+				_ftprintf(stderr, _T("Sample: %") _T(PRId64) _T("/%") _T(PRId64) _T("(% .2f sps)\r"),
+					static_cast<int64_t>(n) * VS_AUDIO_FRAME_SAMPLES, ai.numSamples, fps * VS_AUDIO_FRAME_SAMPLES);
+			}
+		}
+	}
 }
 
 void print_vi(const VSVideoInfo &vi)
@@ -758,32 +1021,32 @@ void run_script(const Arguments &args, FILE *out_file, FILE *tc_file)
 		return;
 	}
 	if (args.reflection) {
-		;// print_graph(node);
+		(void)0;// print_graph(node);
 		return;
 	}
 
 	if (node.type() == mtVideo)
 		pipe_video(args, core, node, has_alpha, out_file, tc_file);
 	else
-		;// pipe_audio(args, core, node, out_file);
+		pipe_audio(args, core, node, out_file);
 
 	auto end_time = std::chrono::high_resolution_clock::now();
 
 	int64_t num_frames_or_samples = node.type() == mtVideo ? node.video_info().numFrames : node.audio_info().numSamples;
-	int64_t end_frame_or_sample = args.end_frame < 0 ? num_frames_or_samples : args.end_frame;
+	int64_t end_frame_or_sample = args.end_frame_or_sample < 0 ? num_frames_or_samples : args.end_frame_or_sample;
 	double elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time).count();
-	double fps_or_sps = (end_frame_or_sample - args.start_frame) / elapsed;
+	double fps_or_sps = (end_frame_or_sample - args.start_frame_or_sample) / elapsed;
 
 	if (args.progress)
 		_fputts(_T("\n"), stdout);
 
 	if (node.type() == mtVideo)
-		_ftprintf(stderr, _T("Output %" PRId64 " frames in %.2f seconds (%.2f fps)\n"), end_frame_or_sample - args.start_frame + 1, elapsed, fps_or_sps);
+		_ftprintf(stderr, _T("Output %" PRId64 " frames in %.2f seconds (%.2f fps)\n"), end_frame_or_sample - args.start_frame_or_sample + 1, elapsed, fps_or_sps);
 	else
-		_ftprintf(stderr, _T("Output %" PRId64 " samples in %.2f seconds (%.2f sample/s)\n"), end_frame_or_sample - args.start_frame + 1, elapsed, fps_or_sps);
+		_ftprintf(stderr, _T("Output %" PRId64 " samples in %.2f seconds (%.2f sample/s)\n"), end_frame_or_sample - args.start_frame_or_sample + 1, elapsed, fps_or_sps);
 
 	if (args.perf_counters && vsxx4::get_vsapi()->getNodeFilterTime)
-		;// print_perf_counters(node, alpha_node);
+		(void)0;// print_perf_counters(node, alpha_node);
 }
 
 void run(const Arguments &args)
@@ -859,6 +1122,20 @@ int _tmain(int argc, _TCHAR **argv)
 					throw BadCommandLine{};
 				}
 			};
+			auto parse_int64 = [&](int64_t &out)
+			{
+				require_next();
+
+				try {
+					out = std::stoll(tstring(argv[n]));
+				} catch (const std::invalid_argument &) {
+					_ftprintf(stderr, _T("error parsing value as integer: %") FMT_TS _T("\n"), argv[n]);
+					throw BadCommandLine{};
+				} catch (const std::out_of_range &) {
+					_ftprintf(stderr, _T("integer out of range: %") FMT_TS _T("\n"), argv[n]);
+					throw BadCommandLine{};
+				}
+			};
 
 			if (MATCH("-h") || MATCH("-?") || MATCH("--help")) {
 				args.help = true;
@@ -886,9 +1163,9 @@ int _tmain(int argc, _TCHAR **argv)
 
 				args.script_args.emplace(std::move(key), std::move(value));
 			} else if (MATCH("-s") || MATCH("--start")) {
-				parse_int(args.start_frame);
+				parse_int64(args.start_frame_or_sample);
 			} else if (MATCH("-e") || MATCH("--end")) {
-				parse_int(args.end_frame);
+				parse_int64(args.end_frame_or_sample);
 			} else if (MATCH("-o") || MATCH("--outputindex")) {
 				parse_int(args.out_idx);
 			} else if (MATCH("-r") || MATCH("--requests")) {
