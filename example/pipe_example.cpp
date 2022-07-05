@@ -17,6 +17,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #ifdef _WIN32
   #include <Windows.h>

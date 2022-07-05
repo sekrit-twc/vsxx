@@ -3,6 +3,7 @@
 #include <cassert>
 #include <chrono>
 #include <cinttypes>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -133,7 +134,7 @@ class VSScriptLibrary {
 #ifdef _WIN32
 		proc = GetProcAddress(static_cast<HMODULE>(s_handle), "getVSScriptAPI");
 #else
-		proc = dlsym(s_handle, "getVSScriptAPI")
+		proc = dlsym(s_handle, "getVSScriptAPI");
 #endif
 		get_vss = reinterpret_cast<const VSSCRIPTAPI * VS_CC(*)(int)>(proc);
 		if (!get_vss)
