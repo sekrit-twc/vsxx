@@ -764,7 +764,7 @@ public:
 	int set_linear() const noexcept { return get_vsapi()->setLinearFilter(get()); }
 
 	// VSAPI::setCacheMode
-	void set_cache_mode(int mode) const noexcept { return get_vsapi()->setCacheMode(get(), mode); }
+	void set_cache_mode(::VSCacheMode mode) const noexcept { return get_vsapi()->setCacheMode(get(), static_cast<int>(mode)); }
 
 	// VSAPI::setCacheOptions
 	void set_cache_options(int fixed_size, int max_size, int max_history_size) const noexcept

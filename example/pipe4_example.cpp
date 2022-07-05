@@ -892,7 +892,7 @@ void pipe_audio(const Arguments &args, const vsxx4::Core &core, const vsxx4::Fil
 		write_wave64_header(out_file, trim_ai);
 
 	// Enable cache for prefetch.
-	trim_node.set_cache_mode(1);
+	trim_node.set_cache_mode(cmForceEnable);
 
 	// Do output.
 	FpsCounter fps_counter;
