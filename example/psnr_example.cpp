@@ -57,7 +57,7 @@ public:
 		if ((vi.format.sampleType == stInteger && vi.format.bytesPerSample > 2) || (vi.format.sampleType == stFloat && vi.format.bytesPerSample != 4))
 			throw std::runtime_error{ "unsupported pixel format" };
 
-		out.set_prop("clip", create_video_filter(vi, fmParallel, make_deps().add_dep(m_dis_node, rpStrictSpatial).add_dep(m_ref_node, rpStrictSpatial), core));
+		create_video_filter(out, vi, fmParallel, make_deps().add_dep(m_dis_node, rpStrictSpatial).add_dep(m_ref_node, rpStrictSpatial), core);
 	}
 
 	ConstFrame get_frame_initial(int n, const Core &core, const FrameContext &frame_context, void *) override

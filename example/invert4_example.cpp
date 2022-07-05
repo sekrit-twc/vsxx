@@ -26,7 +26,7 @@ public:
 		if (m_vi.format.colorFamily == cfUndefined || m_vi.format.sampleType != stInteger || m_vi.format.bitsPerSample != 8)
 			throw std::runtime_error{ "clip must be 8-bit integer" };
 
-		out.set_prop("clip", create_video_filter(m_vi, fmParallel, simple_dep(m_node, rpStrictSpatial), core));
+		create_video_filter(out, m_vi, fmParallel, simple_dep(m_node, rpStrictSpatial), core);
 	}
 
 	ConstFrame get_frame_initial(int n, const Core &core, const FrameContext &frame_context, void *) override
